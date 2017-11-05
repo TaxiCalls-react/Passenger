@@ -1,6 +1,6 @@
 //import liraries
 import React, { Component } from 'react';
-import { View, Text, Image, StyleSheet, KeyboardAvoidingView, ToastAndroid } from 'react-native';
+import { View, Text, Image, ScrollView, StyleSheet, TextInput, KeyboardAvoidingView, ToastAndroid } from 'react-native';
 import { List, ListItem, Button} from 'react-native-elements'
 
 // create a component
@@ -10,16 +10,38 @@ class Home extends React.Component {
     super();
 
     this.state = {
+      latitudeFrom: null,
+      longitudeFrom: null,
+      latitudeTo: null,
+      longitudeTo: null,
       availableDrivers: [
         {
-          name: 'Amy Farha',
-          subtitle: 'Vice President'
+          id: 'Amy Farha',
+          atualCoordinate: {
+            latitude: 1,
+            longitude: 1
+          }
         },
         {
-          name: 'Chris Jackson',
-          subtitle: 'Vice Chairman'
+          id: 'Chris Jackson',
+          atualCoordinate: {
+            latitude: 1,
+            longitude: 1
+          }
         },
-      ]
+      ],
+      notifications: [
+          {
+            fromId: 'Amy Farha',
+            createdTime: '21/10/2000:23h00min',
+            content: 'Vice President'
+          },
+          {
+            fromId: 'Chris Jackson',
+            createdTime: '22/10/2000:00h00min',
+            content: 'Vice Chairman'
+          },
+        ]
     };
   }
 
@@ -37,56 +59,142 @@ class Home extends React.Component {
       body: JSON.stringify({
         "addressFrom": {
       		"coordinate": {
-      			"latitude": 1,
-      			"longitude": 1
+      			"latitude": this.state.latitudeFrom,
+      			"longitude": this.state.longitudeFrom
       		}
       	},
       	"addressTo": {
       		"coordinate": {
-      			"latitude": 5,
-      			"longitude": 5
+      			"latitude": this.state.latitudeTo,
+      			"longitude": this.state.longitudeTo
       		}
       	}
       }),
     })
     .then((response) => response.json())
     .then((responseJson) => {
-      this.setState({availableDrivers: responseJson.entity});
+      if (responseJson.status == "SUCCESSFUL") {
+        ToastAndroid.show('OK', ToastAndroid.SHORT);
+        this.setState({availableDrivers: responseJson.entity});
+      } else {
+        alert(JSON.stringify(responseJson));
+      }
     })
     .catch((error) => {
       ToastAndroid.show('Network Failed', ToastAndroid.SHORT);
     });
   }
 
-  chooseDriver(){
-    ToastAndroid.show('driverChoosen', ToastAndroid.SHORT);
+  chooseDriver(id){
+    const { params } = this.props.navigation.state;
+    return fetch('http://192.168.25.6:8080/passengers/trips/drivers/choose', {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        "driver": {
+      		"id": id
+      	},
+      	"passenger": {
+      		"id": params.user.id
+      	}
+      }),
+    })
+    .then((response) => response.json())
+    .then((responseJson) => {
+      if (responseJson.status == "SUCCESSFUL") {
+        ToastAndroid.show('Driver Choosen', ToastAndroid.SHORT);
+      } else {
+        alert(JSON.stringify(responseJson));
+      }
+    })
+    .catch((error) => {
+      ToastAndroid.show('Network Failed', ToastAndroid.SHORT);
+    });
+  }
+
+  checkNotifications() {
+    const { params } = this.props.navigation.state;
+    return fetch('http://192.168.25.6:8080/passengers/notifications/check', {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+      	"id": params.user.id
+      }),
+    })
+    .then((response) => response.json())
+    .then((responseJson) => {
+      if (responseJson.status == "SUCCESSFUL") {
+        ToastAndroid.show('OK', ToastAndroid.SHORT);
+        this.setState({notifications: responseJson.entity});
+      } else {
+        alert(JSON.stringify(responseJson));
+      }
+    })
+    .catch((error) => {
+      ToastAndroid.show('Network Failed', ToastAndroid.SHORT);
+    });
   }
 
   render() {
     const { navigate } = this.props.navigation;
     const { params } = this.props.navigation.state;
     return (
-      <View>
+      <ScrollView>
         <Text>Hello {params.user.email}</Text>
+        <TextInput autoCapitalize="none"
+                   onChangeText={(latitudeFrom) => this.setState({latitudeFrom})}
+                   autoCorrect={false}
+                   returnKeyType="next"
+                   placeholder='latitudeFrom'
+                   placeholderTextColor='rgba(10,10,10,0.7)' />
+
+        <TextInput placeholder='longitudeFrom'
+                   onChangeText={(longitudeFrom) => this.setState({longitudeFrom})}
+                   placeholderTextColor='rgba(10,10,10,0.7)' />
+
+        <TextInput autoCapitalize="none"
+                   onChangeText={(latitudeTo) => this.setState({latitudeTo})}
+                   autoCorrect={false}
+                   returnKeyType="next"
+                   placeholder='latitudeTo'
+                   placeholderTextColor='rgba(10,10,10,0.7)' />
+
+        <TextInput placeholder='longitudeTo'
+                   onChangeText={(longitudeTo) => this.setState({longitudeTo})}
+                   placeholderTextColor='rgba(10,10,10,0.7)' />
         <Button title='getAvailableDrivers' onPress={() => this.getAvailableDrivers()} />
         <List containerStyle={{marginBottom: 20}}>
           {
             this.state.availableDrivers.map((l, i) => (
               <ListItem
                 key={i}
-                title={l.name}
-                subtitle={l.subtitle}
-                onPress={() => this.chooseDriver()}
+                title={l.id}
+                subtitle={"(" + l.atualCoordinate.latitude + ", " + l.atualCoordinate.longitude + ")"}
+                onPress={() => this.chooseDriver(l.id)}
               />
             ))
           }
         </List>
-
-        <Button
-          onPress={() => navigate('Login')}
-          title="logoff"
-        />
-      </View>
+        <Button title='checkNotifications' onPress={() => this.checkNotifications()} />
+        <List containerStyle={{marginBottom: 20}}>
+          {
+            this.state.notifications.map((l, i) => (
+              <ListItem
+                key={i}
+                title={l.fromId}
+                subtitle={"[" + l.createdTime + "] " + l.content}
+              />
+            ))
+          }
+        </List>
+        <Button title="logoff" onPress={() => navigate('Login')} />
+      </ScrollView>
     );
   }
 }

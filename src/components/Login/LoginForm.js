@@ -37,6 +37,7 @@ class LoginForm extends Component {
         if (responseJson.status == "SUCCESSFUL"){
           this.props.navigation('Home', {
             "user": {
+              "id": responseJson.entity.id,
               "email": this.state.email,
               "password": this.state.password
             }
